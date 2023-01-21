@@ -20,6 +20,8 @@ library(corrplot)
 #Slide 3. Histogram.
 #Choosing the variables and the correlogram
 
+getwd()
+
 data1 <- read_xlsx("data_prep.csv.xlsx", sheet = "clean")
 view(data1)
 
@@ -80,6 +82,49 @@ corrplot(corr_all, method = 'shade', order = 'AOE', diag = FALSE, tl.col = 'blac
 corrplot(corr_all, is.corr = FALSE, col.lim = c(min(cor_sorted), max(cor_sorted)+0.5), method = 'color', tl.pos = 'n',
          col = COL1('Purples'), cl.pos = 'b', addgrid.col = 'white', addCoef.col = 'black')
 
-#descriptive statistics
+#Slide 5.
+#tld variable. barplot.
 
+data_to_use <- as.data.frame(data2) 
+
+typeof(data_to_use$tld)
+
+#as well as we have a character type of data, there is no sense in descriptive statists except separating 
+#observations by the type of domain
+
+#lets see what values are unique
+
+uniq_groups <- unique(data_to_use$tld)
+
+#lets group by all the values to see what number of observations there are in each group
+
+agg_tld <- data_to_use %>% group_by(tld) %>% 
+  summarise(total_count=n(),
+            .groups = 'drop')
+
+agg_tld_srt <- agg_tld[order(agg_tld$total_count,decreasing = TRUE),]
+
+#I will be interested only in 10 first TOP endings of the site
+
+bar_data <- agg_tld_srt %>% 
+  filter(.,total_count >= 21)
+
+top_10_dom <- pull(bar_data, "tld")
+
+bar_data_1 <- data_to_use %>% 
+  filter(., tld %in% top_10_dom)
+
+ggplot(bar_data_1, aes(x=as.factor(tld))) +
+  geom_bar(colour = "black",fill="#69b3a2")
+
+#as a conclusion of this graph we can say that there are
+#not a lot of options to purchase a site with another domain
+
+#does it affect the price?
+#we can check it with adding another variable 
+#and by using a scatter plot
+
+ggplot(bar_data_1) +
+  aes(x = bar_data_1$`CPCUS(USD)`, y = Price) +
+  geom_point(aes(color = tld, shape = tld))
 
