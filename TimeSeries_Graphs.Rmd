@@ -143,10 +143,4 @@ heatmap(data_4_scaled, Colv = NA, Rowv = NA, scale="column", col = colorRampPale
 
 ```
 
-```{r}
-use_github(protocol = 'https', auth_token = Sys.getenv("GITHUB_PAT"))
-
-edit_r_environ()
-
-```
 
