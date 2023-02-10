@@ -1,0 +1,147 @@
+---
+title: "HW_3_Individual"
+author: "Volodymyr Kotov"
+date: "2023-01-30"
+output: 
+  prettydoc::html_pretty:
+    toc: true
+    theme: "cayman"
+    highlight: "vignette"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Task to complete
+
+- For this task use *debt* dataset depicting changes in debt-to-GDP ratio in EU
+- Drop the line corresponding to your birth day + 1 - somebody born on the 21st would drop line 22 (1st line contains names)
+- First, produce a scatter plot with Debt_to_GDP in 2003 on x-axis, Debt_to_GDP in 2007 on y-axis and country names as text labels
+- Second, produce colored dendrogram with 3 clusters 
+- Third, generate a heatmap with any color palette instead of green including Debt_to_GDP for all years
+
+Loading libraries:
+
+```{r, results='hide', message=FALSE}
+
+#if(!require("quantmod")) install.packages("quantmod")
+#if(!require("ggrepel")) install.packages("ggrepel")
+#if(!require("corrplot")) install.packages("corrplot")
+#if(!require("ggraph")) install.packages("ggraph")
+#if(!require("igraph")) install.packages("igraph")
+#if(!require("dendroextras")) install.packages("dendroextras")
+#if(!require("ape")) install.packages("ape")
+
+library(quantmod) 
+library(readxl)
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(ggrepel)
+library(ggraph)
+library(igraph)
+library(dendroextras)
+library(ape)
+
+```
+
+Uploading data:
+
+```{r, results='hide'}
+
+data_1 <- read_xlsx("Data_Shrink_Debt.xlsx", sheet = "debt")
+
+```
+
+
+- Drop the line corresponding to your birth day + 1 - somebody born on the 21st would drop line 22 (1st line contains names). My birhday day is the 17th, so lets remove this line.
+
+```{r, results='hide'}
+
+data_1 <- as.data.frame(data_1)
+data_2 <- data_1 %>% 
+  filter(., row_number(data_1) != 17)
+
+```
+
+------------------------------------------------------------------------
+
+# Scatter Plot
+
+- First, produce a scatter plot with Debt_to_GDP in 2003 on x-axis, Debt_to_GDP in 2007 on y-axis and country names as text labels:
+
+```{r, warning=FALSE}
+
+ggplot(data_2, aes(x = data_2$Debt_to_GDP_Ratio_2003, y = data_2$Debt_to_GDP_Ratio_2007)) + 
+  geom_point(color = "#69b3a2", size = 5) + 
+  geom_label_repel(label = data_2$Country,  size=2.5) +
+  labs(
+    x = "Debt_to_GDP in 2003",
+    y = "Debt_to_GDP in 2007"
+  ) +
+  theme(
+    axis.title.x = element_text(color = "black", size = 14, face = "bold"),
+    axis.title.y = element_text(color = "black", size = 14, face = "bold")
+  )
+
+```
+
+------------------------------------------------------------------------
+
+# Dendogram
+
+- Second, produce colored dendrogram with 3 clusters:
+
+```{r, warning=FALSE}
+
+data_3 <- data_2
+rownames(data_3) <- data_2$Country
+data_dist_matrix = dist(data_3, method = "euclidean")
+data_clustered = hclust(data_dist_matrix)
+
+par(mar = c(2,10,2,10), cex = 0.6)
+data_clustered_1 = colour_clusters(hclust(dist(data_dist_matrix), "ave"), 3, groupLabels = as.roman)
+plot(data_clustered_1, main = "Dendrogram with 3 clusters", horiz = TRUE, type = "triangle")
+
+```
+
+------------------------------------------------------------------------
+
+# Heatmap
+
+- Third, generate a heatmap with any color palette instead of green including Debt_to_GDP for all years:
+
+```{r, message=FALSE, warning=FALSE}
+if(!require("pheatmap")) install.packages("pheatmap")
+if(!require("RColorBrewer")) install.packages("RColorBrewer")
+library("pheatmap")
+library("RColorBrewer")
+
+names_num <- c()
+
+for (i in (1:ncol(data_3))) {
+  if (sapply(data_3[i], class)[1] == "numeric") {
+    names_num <- c(names_num, names(data_3[i]))
+  }
+} 
+
+data_4 <- data_3 %>% 
+  select(., names_num)
+
+data_4_scaled = as.matrix(scale(data_4))
+
+col_names <- c()
+for (name in (colnames(data_4_scaled))){
+ col_names <- c(col_names, as.numeric(unlist(str_extract_all(name,"[[:digit:]]{4}"))))
+}
+    
+colnames(data_4_scaled) <- col_names
+
+heatmap(data_4_scaled, Colv = NA, Rowv = NA, scale="column", col = colorRampPalette(brewer.pal(8, "Blues"))(25), main="Debt to GDP ratio heatmap", cexRow = 0.9, cexCol = 0.9, xlab="year")
+
+```
+
+
+
