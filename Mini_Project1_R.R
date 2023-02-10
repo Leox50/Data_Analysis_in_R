@@ -33,7 +33,9 @@ names_num <- c()
 
 ggplot(data2, aes(x=data2$Price)) +
   geom_histogram(aes(y = ..density..), color = "#000000", fill = "#0099F8") +
-  geom_density(color = "#000000", fill = "#F85700", alpha = 0.6)
+  geom_density(color = "#000000", fill = "#F85700", alpha = 0.6) +   
+  labs(title="Price Distribution Rough", 
+       caption="Graph: Histogram",x = "Price", y = "Density")
 
 #it doesn't look good. lets try to make it smoother by removing the outliers (95% quantile).
 
@@ -49,7 +51,9 @@ nrow(data2) - nrow(data4)
 
 ggplot(data4, aes(x=data4$Price)) +
   geom_histogram(aes(y = ..density..), color = "#000000", fill = "#0099F8") +
-  geom_density(color = "#000000", fill = "#F85700", alpha = 0.6)
+  geom_density(color = "#000000", fill = "#F85700", alpha = 0.6) +   
+  labs(title="Price Distribution Cleaned", 
+       caption="Graph: Histogram",x = "Price", y = "Density")
 
 #now our distribution is still bad, but a bit smoother comparing to what we had.
 
@@ -73,7 +77,7 @@ cor_sorted
 #our correlations are pretty weak.
 #lets plot a graph to confirm that.
 
-corrplot(corr_all, method = 'shade', order = 'AOE', diag = FALSE, tl.col = 'black')
+corrplot(corr_all, method = 'shade', order = 'AOE', diag = FALSE, tl.col = 'black', title="Correlation", mar=c(10,0,5,0),sub="Graph: Correlation heatmap")   
 
 #Slide 5.
 #tld variable. barplot.
@@ -108,18 +112,24 @@ bar_data_1 <- data_to_use %>%
   filter(., tld %in% top_10_dom)
 
 ggplot(bar_data_1, aes(x=as.factor(tld))) +
-  geom_bar(colour = "black",fill="#69b3a2")
+  geom_bar(colour = "black",fill="#69b3a2") +   
+  labs(x="Endings",title="Total count by ending", 
+       caption="Graph: Barplot")
 
 #as a conclusion of this graph we can say that there are
 #not a lot of options to purchase a site with another domain
 
 #does it affect the price?
-#we can check it with adding another variable 
-#and by using a scatter plot
+#we can check it with a separate boxplots for all endings.
 
-ggplot(bar_data_1) +
-  aes(x = bar_data_1$`CPCUS(USD)`, y = Price) +
-  geom_point(aes(color = tld, shape = tld))
+ggplot(data_a_rank_new, aes(x=as.factor(tld), y=Price))+
+  geom_boxplot(col='blue') + labs(x='Ending') +   
+  labs(x="Endings",title="Price distridution by endings", 
+       caption="Graph: Boxplot")
+
+#From the graph we can see that the price actually depends on some domains.
+#For example, .com ending has much more outliers that are closer to higher values,
+#.net, .org and .us have higher prices for sites in general.
 
 #Slide 6. «reg32» & «free32». 
 
@@ -133,15 +143,15 @@ summary(data_to_use$Reg32)
 #Scatterplot
 
 ggplot(data_to_use, aes(Free32, Price)) +
-       geom_point(col='blue') + geom_point(aes(Reg32, Price),color = "tomato")
+       geom_point(col='blue') + geom_point(aes(Reg32, Price),color = "tomato") +   
+  labs(x="Free32 & Reg32",title="Type of TLD on Price", 
+       caption="Graph: Scatterplot")
 
 #as the result, we can see that despite of presence of difference between
 #Free32 and Reg32, there is no significant difference on the graph, so, it is
 #not right to think that in general we prices on Reg32 a higher.
 
-#Slide 7. SG variable
-
-#Slide 8. Alexa rank and traffic 
+#Slide 7. Alexa rank and traffic 
 #We have decided to combine these variables as well as these
 #variables both stand for the reliability of the site and are great
 #estimators of the site's wealth. Traffic - a pure variable
@@ -194,41 +204,45 @@ data_a_rank <- data_a_rank %>%
 
 #lets build a clustering graph
 ggplot(data_a_rank, aes(Traffic, Price, col=Al_rank)) + 
-  geom_point(aes(shape=Al_rank), size=2) +   # draw points
-  labs(title="Clustering by Al rank", 
+  geom_point(aes(shape=Al_rank), size=2) + 
+  labs(title="Clustering by Al rank rough", 
        caption="Graph: Clustering graph") + 
   coord_cartesian(xlim = 1.2 * c(min(data_a_rank$Traffic), max(data_a_rank$Traffic)), 
-                  ylim = 1.2 * c(min(data_a_rank$Price), max(data_a_rank$Price))) +   # change axis limits
-  geom_encircle(data = data_a_rank, aes(x=Traffic, y=Price)) +   # draw circles
+                  ylim = 1.2 * c(min(data_a_rank$Price), max(data_a_rank$Price))) +
+  geom_encircle(data = data_a_rank, aes(x=Traffic, y=Price)) +  
   geom_encircle(data = data_a_rank, aes(x=Traffic, y=Price)) + 
   geom_encircle(data = data_a_rank, aes(x=Traffic, y=Price))
 
+#lets try to make it smoother by removing a 95%+ quantile.
 quantile(data_a_rank$Price, na.rm=TRUE, 0.95)
 quantile(data_a_rank$Traffic, na.rm=TRUE, 0.95)
 
 data_a_rank_new <- data_a_rank %>% 
   filter(., Price < 50000 & Traffic < 9.3)
 
+#lets plot a new one
 ggplot(data_a_rank_new, aes(Traffic, Price, col=Al_rank)) + 
-  geom_point(aes(shape=Al_rank), size=2) +   # draw points
-  labs(title="Clustering by Al rank", 
+  geom_point(aes(shape=Al_rank), size=2) +
+  labs(title="Clustering by Al rank cleaned", 
        caption="Graph: Clustering graph") + 
   coord_cartesian(xlim = 1.2 * c(min(data_a_rank_new$Traffic), max(data_a_rank_new$Traffic)), 
-                  ylim = 1.2 * c(min(data_a_rank_new$Price), max(data_a_rank_new$Price))) +   # change axis limits
-  geom_encircle(data = data_a_rank_new, aes(x=Traffic, y=Price)) +   # draw circles
+                  ylim = 1.2 * c(min(data_a_rank_new$Price), max(data_a_rank_new$Price))) +
+  geom_encircle(data = data_a_rank_new, aes(x=Traffic, y=Price)) +
   geom_encircle(data = data_a_rank_new, aes(x=Traffic, y=Price)) + 
   geom_encircle(data = data_a_rank_new, aes(x=Traffic, y=Price))
 
 nrow(data_a_rank) - nrow(data_a_rank_new) 
+#We have removed only 35 observations. Ir is not too much.
 
-#compare their distributions with boxplots
+#compare their distributions with violinplots.
+ggplot(data_a_rank_new, aes(x=as.factor(Al_rank), y=Price, fill = Al_rank))+
+  geom_violin() +
+  labs(title="Distribution by Al rank", 
+       caption="Graph: Violinplot")
+#As the result, there is no clear difference in prices between Alexa's ratings,
+#so we may disregard this rate in the price formation.
 
-ggplot(data_a_rank_new, aes(x=as.factor(Al_rank), y=Price))+
-  geom_boxplot(col='blue') + labs(x='Overall Quality') +
-  scale_y_continuous(breaks= seq(0, 800000, by=100000))
 
 
-
-
-
+#check it
 
