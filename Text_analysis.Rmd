@@ -1,0 +1,277 @@
+---
+title: "HW 2"
+author: "Volodymyr Kotov"
+date: "2023-01-28"
+output: html_document
+beamer_presentation: default
+slidy_presentation: default
+ioslides_presentation: default
+---
+
+Libraries to use:
+
+```{r}
+
+libs <- c("readxl","tidyverse","tm", "SnowballC","twitteR","ggplot2")
+
+lapply(libs, require, character.only = TRUE)
+
+```
+
+Uploading a file and converting it to a dataframe:
+
+```{r}
+
+data_1 <- read_csv("Airbnb_Texas_Rentals.csv")
+head(data_1)
+
+```
+
+Count the total number X of letters in the last names of all of your team members. Report this number X. Take 1000 descriptions of apartments starting from observation 50*X.
+
+```{r}
+
+last_names <- c("Brusnitseva","Kotov","Aksonov","Vannik")
+X <- 0
+
+for (i in (1:length(last_names))) {
+  X <- X + str_length(last_names[i])
+}
+
+X
+
+```
+
+So, we need to take from `r X * 50` element to `r 1000 + (X*50)` element. Lets do it.
+
+```{r}
+
+data_2 <- data_1$description[(X*50):(1000 + (X*50))]
+data_2 <- as.data.frame(data_2)
+
+```
+
+There are `r nrow(data_2)` observations in our sample.
+
+Lets reformat them to corpus and use lowercase:
+
+```{r}
+
+data_3 <- Corpus(VectorSource(data_2$data_2))
+data_3 <- tm_map(data_3, content_transformer(tolower))
+
+```
+
+let's see a sample from our new dataframe
+
+```{r}
+
+data_3[[sample.int(1000,1)]]$content
+stringr::str_trunc(data_3[[sample.int(1000,1)]]$content, 100)
+
+```
+
+This text might have stopwords, punctuation, extra links and numbers that we should omit:
+
+```{r}
+
+removeURL <- function(x) gsub("http[^[:space:]]*", "", x) 
+data_3 <- tm_map(data_3, content_transformer(removeURL)) #removing any possible external links
+removeNumPunct <- function(x) gsub("[^[:alpha:][:space:]]*", "", x)
+data_3 <- tm_map(data_3, content_transformer(removeNumPunct)) #removing any possible characters that are not considerd as letters
+
+data_3 <- tm_map(data_3, removePunctuation) #removing punctuation
+data_3 <- tm_map(data_3, removeNumbers) #removing numbers
+data_3 <- tm_map(data_3, removeWords, stopwords("english")) #removing stop words, a.k.a commonly used words in English
+```
+Let's take a look at a sample observation now:
+
+```{r}
+
+data_3[[sample.int(1000,1)]]$content
+
+```
+
+It's fine now. Let's separate all the observations into words and them remove any extra white spaces.
+
+```{r}
+
+#first of all, let's take the only roots from the words by stemming them
+data_words_sep <- data_3 #creating a copy
+
+data_words_sep <- tm_map(data_words_sep, stemDocument)
+
+own_stemCompletion <- function(x, dictionary) {
+x <- unlist(strsplit(as.character(x), " "))
+x <- x[x != ""]
+x <- stemCompletion(x, dictionary=dictionary)
+x <- paste(x, sep="", collapse=" ")
+PlainTextDocument(stripWhitespace(x))
+
+}
+#data_words_sep <- lapply(data_words_sep, own_stemCompletion, dictionary=data_3)
+data_words_sep <- Corpus(VectorSource(unlist(lapply(data_words_sep, '[[', 1))))
+
+```
+
+```{r}
+
+data_words_sep[[sample.int(1000,1)]]$content
+
+```
+
+```{r}
+
+dtm <- DocumentTermMatrix(data_words_sep)
+dtm_matrix <- as.matrix(dtm)
+dtm_df <- as.data.frame(dtm_matrix)
+view(dtm_df)
+
+```
+
+We will also try to use our method with no pre-written methods for reporting the second most used word:
+
+```{r}
+#creating a blank dataframe to which hat we will add all our variables
+word <- c(NA)
+count <- c(NA)
+
+df3 <- data.frame(word,count)
+df3
+```
+
+```{r}
+#we need to capture the exact time before our code is executed
+#as we will need it later for a comparison
+
+serv3 <- Sys.time()
+
+#lets create a simple for loop
+for (i in c(names(dtm_df))) { #first parts that goes through the column names
+  count <- 0 #a counter that resets after each new column is counted
+  for (j in c(dtm_df[,i])) { #a second for loop that goes through the 
+    count <- count + j #add all  ones in the dataframe to the counter
+  }
+  #lets vecotrize the results
+  count <- c(count) 
+  word <- c(i)
+  df4 <- data.frame(word, count)
+  #lets merge our dataframes
+  df3 <- rbind(df3,df4)
+}
+#record the time of the last operation
+serv4 <- Sys.time()
+#finally let's get the speed time of the code executed
+serv4 - serv3
+
+```
+
+Lets report 10 first observations:
+
+```{r}
+
+df5 <- df3[order(df3$count,decreasing = TRUE),] #sorting data by count variable
+nrow(df5) #lets see how many observations there are in this dataframe
+
+#for our own purposes of building a barplot, lets make it equal to 10  first observations
+
+df6 <- df5 %>% 
+  filter(., count >= df5$count[10])
+
+df6
+
+```
+
+
+We have also done it with the code presented during the lecture:
+```{r}
+
+#record the time before the code is executed
+serv1 <- Sys.time()
+
+#creating a special matrix
+dtm_2 <- DocumentTermMatrix(data_words_sep)
+dtm_2 <- removeSparseTerms(dtm_2, 1-(10/length(data_words_sep)))
+
+#lets make the length  of the words equal to 1
+tdm_1 <- TermDocumentMatrix(data_words_sep, control = list(wordLengths = c(1, Inf)))
+
+#find frequent words with at least 25 repeatings
+(freq.terms <- findFreqTerms(tdm_1, lowfreq = 25))
+term.freq <- rowSums(as.matrix(tdm_1))
+#and now let's take all observations with 260+ words used
+term.freq <- subset(term.freq, term.freq >= 260)
+df_1 <- data.frame(term = names(term.freq), freq = term.freq)
+
+#record time of the last row executed
+serv2 <- Sys.time()
+
+serv2 - serv1
+
+length(tdm_1)
+```
+
+As we can see, the first method is more slowly on approximately `r round((serv4 - serv3)-(serv2 - serv1),2)` seconds. It might be because some parts of tm package could be written on C language and then integrated to R (we are not confident in this statement as well as there is no confirmation/rejection on the official page with documentation). 
+
+Now, let's build graphs!
+
+1. Barplot with common words of the niche
+2. Word cloud with common words of the niche
+
+```{r}
+
+
+
+```
+
+From the barplot above we can see that the most common words are extremely close to the
+niche of AirBnB. So, let's delete them for a purpose of bringing an insight to this work.
+
+```{r}
+
+custom_stopwrods <- c("home","apartment","place","room","located")
+df_2 <- df_1 %>% 
+  filter(., !(term %in% custom_stopwrods))
+
+df_2
+
+```
+
+
+3. Barplot without common words of the niche
+4. Word cloud without common words of the niche
+
+
+```{r}
+
+data_4 <- tm_map(data_3, removeWords, custom_stopwrods)
+data_words_sep_cleaned <- data_4 #creating a copy
+
+data_words_sep_cleaned <- tm_map(data_words_sep_cleaned, stemDocument)
+
+#data_words_sep_cleaned <- lapply(data_words_sep_cleaned, own_stemCompletion, dictionary=data_4)
+data_words_sep_cleaned <- Corpus(VectorSource(unlist(lapply(data_words_sep_cleaned, '[[', 1))))
+
+#creating a special matrix
+dtm_cleaned <- DocumentTermMatrix(data_words_sep_cleaned)
+dtm_cleaned <- removeSparseTerms(dtm_2, 1-(10/length(data_words_sep_cleaned)))
+
+#lets make the length  of the words equal to 1
+tdm_1_cleaned <- TermDocumentMatrix(data_words_sep_cleaned, control = list(wordLengths = c(1, Inf)))
+
+#find frequent words with at least 25 repeatings
+(freq.terms <- findFreqTerms(tdm_1_cleaned, lowfreq = 25))
+term.freq_cleaned <- rowSums(as.matrix(tdm_1_cleaned))
+#and now let's take all observations with 260+ words used
+term.freq_cleaned <- subset(term.freq_cleaned, term.freq_cleaned >= 200)
+df_1_cleaned <- data.frame(term = names(term.freq_cleaned), freq = term.freq_cleaned)
+df_1_cleaned
+
+```
+
+
+Please do data manipulations in R - the code should run on my computer after loading the original dataset.
+Perform the same steps as we did in class (do not forget about stem completion!).
+Report the second most frequent word (excluding stop words) and 5 words which appear most frequently with this word.
+Plot the word cloud (use online help).
+

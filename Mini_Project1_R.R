@@ -1,26 +1,22 @@
-library(stargazer)
+#for reading files
+library(readxl)
+
+#for correlation:
 library(corrr)
 library(car)
-library(readxl)
-library(stargazer)
-library(car)
-library(tseries)
-library(foreign)
-library(tsibble)
-library(tsibbledata)
-library(feasts)
-library(fable)
-library(urca)
+
+#for tidy data:
 library(dplyr)
 library(tidyverse)
-library(astsa)
+
+#for graphs:
 library(ggplot2)
 library(corrplot)
+library(ggalt)
+library(ggfortify)
 
 #Slide 3. Histogram.
 #Choosing the variables and the correlogram
-
-getwd()
 
 data1 <- read_xlsx("data_prep.csv.xlsx", sheet = "clean")
 view(data1)
@@ -28,7 +24,7 @@ view(data1)
 #we are interested in the effect of the following variables:
 
 data2 <- data1 %>% 
-  select(.,c("Price","Traffic","tld","BL","DP","SG","CPCUS(USD)","Bids","Traffic","Valuation","Endtime"))
+  select(.,c("Price","Traffic","tld","BL","DP","SG","CPCUS(USD)","Bids","Traffic","Valuation","Endtime","Reg32","Free32","Alexa"))
 
 names_num <- c()
 
@@ -79,9 +75,6 @@ cor_sorted
 
 corrplot(corr_all, method = 'shade', order = 'AOE', diag = FALSE, tl.col = 'black')
 
-corrplot(corr_all, is.corr = FALSE, col.lim = c(min(cor_sorted), max(cor_sorted)+0.5), method = 'color', tl.pos = 'n',
-         col = COL1('Purples'), cl.pos = 'b', addgrid.col = 'white', addCoef.col = 'black')
-
 #Slide 5.
 #tld variable. barplot.
 
@@ -127,4 +120,115 @@ ggplot(bar_data_1, aes(x=as.factor(tld))) +
 ggplot(bar_data_1) +
   aes(x = bar_data_1$`CPCUS(USD)`, y = Price) +
   geom_point(aes(color = tld, shape = tld))
+
+#Slide 6. «reg32» & «free32». 
+
+summary(data_to_use$Free32)
+summary(data_to_use$Reg32)
+
+#despite of a high correlation between these two variables,
+#the descriptive statistics is a bit differs, so lets check
+#the difference on a graph
+
+#Scatterplot
+
+ggplot(data_to_use, aes(Free32, Price)) +
+       geom_point(col='blue') + geom_point(aes(Reg32, Price),color = "tomato")
+
+#as the result, we can see that despite of presence of difference between
+#Free32 and Reg32, there is no significant difference on the graph, so, it is
+#not right to think that in general we prices on Reg32 a higher.
+
+#Slide 7. SG variable
+
+#Slide 8. Alexa rank and traffic 
+#We have decided to combine these variables as well as these
+#variables both stand for the reliability of the site and are great
+#estimators of the site's wealth. Traffic - a pure variable
+#that shows how many people visit websites.
+#Alexa rank has it's own analytics and grading system that focuses mostly
+#on traffics and the amount of backlinks.
+#The goal of this slide is to define either there is any influence on the
+#price because of the high rates of Alexa and if it always means that the higher
+#traffic equals to a higher rate on Alexa.
+
+#Firstly, lets check their descriptive statistics.
+
+summary(data_to_use$Traffic)
+summary(data_to_use$Alexa)
+
+#For the Alexa's rank to be defined properly, lets divide our observations in three groups.
+#a_top - good rate according to Alexa's specifications
+#a_med - medium rate according to Alexa's specifications
+#a_low - low rate according to Alexa's specifications
+
+#lets say that 1 - 250 000 is a good one, 250 000 - 1 000 000, a medium one, 
+#and 1 000 000+ - bad one
+
+#lets separate data then
+
+data_to_use$Al_rank <- NULL
+
+data_a_rank <- data_to_use %>% 
+  mutate(Al_rank = case_when(
+  data_to_use$Alexa == 0 | is.na(data_to_use$Alexa) ~ "no_data",
+  data_to_use$Alexa <= 250000 ~ 'a_top',
+  data_to_use$Alexa >= 250001 & data_to_use$Alexa <= 1000000 ~ 'a_med',
+  data_to_use$Alexa >= 1000001 ~ 'a_low'
+))
+
+#lets see how many observations there are in each group
+
+agg_a_rank <- data_a_rank %>% group_by(Al_rank) %>% 
+  summarise(total_count=n(),
+            .groups = 'drop')
+
+agg_a_rank
+
+data_a_rank <- data_a_rank %>% 
+  filter(.,data_a_rank$Al_rank != "no_data")
+
+#From what we can see, there are much more of data that does not have a rank
+#it might be because of a low-quality website with a low traffic, so
+#it didn't pass Alexa's standards, or simply because there is no data.
+
+#lets build a clustering graph
+ggplot(data_a_rank, aes(Traffic, Price, col=Al_rank)) + 
+  geom_point(aes(shape=Al_rank), size=2) +   # draw points
+  labs(title="Clustering by Al rank", 
+       caption="Graph: Clustering graph") + 
+  coord_cartesian(xlim = 1.2 * c(min(data_a_rank$Traffic), max(data_a_rank$Traffic)), 
+                  ylim = 1.2 * c(min(data_a_rank$Price), max(data_a_rank$Price))) +   # change axis limits
+  geom_encircle(data = data_a_rank, aes(x=Traffic, y=Price)) +   # draw circles
+  geom_encircle(data = data_a_rank, aes(x=Traffic, y=Price)) + 
+  geom_encircle(data = data_a_rank, aes(x=Traffic, y=Price))
+
+quantile(data_a_rank$Price, na.rm=TRUE, 0.95)
+quantile(data_a_rank$Traffic, na.rm=TRUE, 0.95)
+
+data_a_rank_new <- data_a_rank %>% 
+  filter(., Price < 50000 & Traffic < 9.3)
+
+ggplot(data_a_rank_new, aes(Traffic, Price, col=Al_rank)) + 
+  geom_point(aes(shape=Al_rank), size=2) +   # draw points
+  labs(title="Clustering by Al rank", 
+       caption="Graph: Clustering graph") + 
+  coord_cartesian(xlim = 1.2 * c(min(data_a_rank_new$Traffic), max(data_a_rank_new$Traffic)), 
+                  ylim = 1.2 * c(min(data_a_rank_new$Price), max(data_a_rank_new$Price))) +   # change axis limits
+  geom_encircle(data = data_a_rank_new, aes(x=Traffic, y=Price)) +   # draw circles
+  geom_encircle(data = data_a_rank_new, aes(x=Traffic, y=Price)) + 
+  geom_encircle(data = data_a_rank_new, aes(x=Traffic, y=Price))
+
+nrow(data_a_rank) - nrow(data_a_rank_new) 
+
+#compare their distributions with boxplots
+
+ggplot(data_a_rank_new, aes(x=as.factor(Al_rank), y=Price))+
+  geom_boxplot(col='blue') + labs(x='Overall Quality') +
+  scale_y_continuous(breaks= seq(0, 800000, by=100000))
+
+
+
+
+
 
